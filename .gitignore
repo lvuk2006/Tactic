@@ -1,0 +1,21 @@
+# build output
+build/
+*.o
+*.obj
+*.out
+*.elf
+*.bin
+*.hex
+*.map
+*.d
+*.su
+*.dSYM/
+
+# host tool binaries
+host/btnfit
+host/btnvec_check
+
+# generated weights are checked IN on purpose -- the demo must be
+# reproducible from the repo alone. Do not add weights.h here.
+
+.DS_Store

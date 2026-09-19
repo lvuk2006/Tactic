@@ -1,0 +1,39 @@
+Copyright (c) 2026 Luka Vukmirica. All rights reserved.
+
+SOURCE-VISIBLE, NOT OPEN SOURCE.
+
+This repository is published so that it can be read: to review the design, the
+measurements, and the reasoning behind them. It is not open source, and no
+license to use it is granted here.
+
+You MAY, for personal, educational, or evaluation purposes only:
+  - read this source code
+  - build and run it on your own hardware
+  - modify it locally, for your own experimentation
+  - quote short excerpts with attribution, for discussion, review, or teaching
+
+You MAY NOT, without prior written permission from the copyright holder:
+  - use this code commercially, or in any product or service
+  - redistribute it, modified or unmodified, in whole or in part
+  - incorporate it into other software, including as a dependency
+  - sublicense or sell it
+
+Permission requests: luka.vukmirica@gmail.com. Rights may be granted on
+request; the default is simply that they are reserved until then.
+
+THIRD-PARTY CONTENT
+
+Files under vendor/ are the property of Texas Instruments Incorporated and are
+redistributed unmodified under the BSD 3-Clause license, whose terms appear in
+the header of each of those files. Nothing in this notice alters, restricts, or
+extends the terms under which those files are provided; this notice applies
+only to the files authored by the copyright holder above.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
