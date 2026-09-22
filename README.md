@@ -10,9 +10,10 @@ trained linear readout. In ML terms: a time-delay convolutional reservoir with a
 random substrate, where only the readout is fitted. None of those pieces are new — see
 [Where this sits](#where-this-sits) — the point here is the composition, the size, and
 the fact that the memory horizon is a number you can state exactly instead of a property
-you hope for. The filters are FIR, so the network cannot diverge due to a lack of a spectral radius, has no state to wind
-up, and looks back exactly K1 + K2 - 1 = 63 samples. At 10 Hz that is 6.3 seconds, and
-it is true by construction rather than by measurement.
+you hope for. The filters are FIR, so the network is guaranteed to never diverge since
+there isn't any mistunable spectral radius, has no state to wind up, and looks back 
+exactly K1 + K2 - 1 = 63 samples. At 10 Hz that is 6.3 seconds, and it is true by construction 
+rather than by measurement.
 
 ## Status
 
@@ -42,7 +43,7 @@ that ignores order — a counter, a sum, a mean, total energy — is provably at
 That was the whole reason for choosing this task: it cannot be solved by the cheap thing,
 so it is an honest test of whether temporal structure is being captured.
 
-While a hand-written state machine can also solve it, the interesting comparison is not when you feed the system clean input but jittered input. This is where an FSM
+While a hand-written state machine can also solve it, the interesting comparison comes when you feed the system jittered input instead of clean inputs. This is where an FSM
 has to commit at each threshold and cannot revise. Measuring that is on the list below.
 
 ## Numbers
@@ -140,6 +141,8 @@ TI's 688 B. `CMakeLists.txt` now defaults to Release.
 Verified: the fit reproduces byte-identically; host and firmware share one arithmetic path;
 the FIFO indexing is phase-independent (all 32 start phases produce identical output, so
 there is no incomplete-window case); both accumulator bounds are asserted at compile time.
+This means that at any point in time where the system is running, it is designed to properly 
+run inference the input pattern.
 
 Not verified: anything involving the board, because the runtime loop is not written yet.
 
@@ -153,7 +156,10 @@ traces.
 Reservoir computing is Jaeger's echo state networks (2001) and Maass's liquid state machines
 (2002): a fixed nonlinear map over input history, with only a linear readout trained. The
 feedforward version is Gauthier et al., *Next generation reservoir computing* (2021), which
-drops recurrence entirely for time-delay taps and a linear readout.
+drops recurrence entirely for time-delay taps and a linear readout. Tactic differentiates
+itself by using tanh activation function lookup tables for the nonlinearity instead of having 
+to generate polynomials using NVAR techniques, eliminating the need for polynomial expansion 
+based on the number of delay terms.
 
 The choice to keep the substrate linear and put the nonlinearity at the boundary has a nice
 experimental precedent in Vandoorne et al., *Experimental demonstration of reservoir computing
