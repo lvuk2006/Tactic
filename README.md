@@ -5,12 +5,12 @@
 Temporal pattern recognition on a TI MSPM0G3507 (Cortex-M0+, 80 MHz, 32 KB SRAM).
 One button in, three LEDs out, no host connection once it is flashed.
 
-In DSP terms: a bank of fixed random FIR filters, a tanh, a second FIR stage, and a
+In DSP terms: a bank of fixed random FIR filters, a tanh activation lookup table, a second FIR stage, and a
 trained linear readout. In ML terms: a time-delay convolutional reservoir with a fixed
 random substrate, where only the readout is fitted. None of those pieces are new — see
 [Where this sits](#where-this-sits) — the point here is the composition, the size, and
 the fact that the memory horizon is a number you can state exactly instead of a property
-you hope for. The filters are FIR, so the network cannot diverge, has no state to wind
+you hope for. The filters are FIR, so the network cannot diverge due to a lack of a spectral radius, has no state to wind
 up, and looks back exactly K1 + K2 - 1 = 63 samples. At 10 Hz that is 6.3 seconds, and
 it is true by construction rather than by measurement.
 
@@ -24,7 +24,7 @@ and it is what I am writing now.
 - CMake + arm-none-eabi toolchain and DSLite flashing: **done** — the CMake build reproduces
   TI's own makefile output byte for byte, 688 B, which is how I know the toolchain is honest
 - Runtime loop, button ISR and LED output: **in progress.** `src/main.c` is deliberately not
-  in the repo until it is mine — I would rather ship no entry point than TI's blink example
+  in the repo until it is complete — I would rather ship no entry point than TI's blink example
   wearing my name.
 
 Practical consequence: the **host tools build and run today**, and the firmware target is
@@ -42,8 +42,7 @@ that ignores order — a counter, a sum, a mean, total energy — is provably at
 That was the whole reason for choosing this task: it cannot be solved by the cheap thing,
 so it is an honest test of whether temporal structure is being captured.
 
-A hand-written state machine can also solve it, and anyone from embedded will think of that
-immediately. The interesting comparison is not clean input but jittered input, where an FSM
+While a hand-written state machine can also solve it, the interesting comparison is not when you feed the system clean input but jittered input. This is where an FSM
 has to commit at each threshold and cannot revise. Measuring that is on the list below.
 
 ## Numbers
@@ -119,7 +118,7 @@ Host tools and a refit, which rewrites `src/weights.h` and `host/golden.h`:
 
     cd host && make && ./btnfit
 
-It is deterministic — same seed, same output, byte for byte. `weights.h` is checked into
+It is deterministic — same initialization seed, same output, byte for byte. `weights.h` is checked into
 the repo on purpose, so the firmware builds without running the fitter first.
 
 Firmware (once `src/main.c` is in — see Status):
@@ -132,7 +131,7 @@ Needs `arm-none-eabi-gcc` (tested with 15.3.Rel1), the MSPM0 SDK 2.10.00.04, and
 from CCS for flashing. No OpenOCD. Override the SDK path with `-DMSPM0_SDK=...` if yours
 lives somewhere else.
 
-One trap worth repeating, since it cost me a build: with Make or Ninja, `CMAKE_BUILD_TYPE`
+One trap worth mentioning oncemore, since it cost me a build: with Make or Ninja, `CMAKE_BUILD_TYPE`
 defaults to empty, which means no `-O` flag at all. The binary came out at 1176 B against
 TI's 688 B. `CMakeLists.txt` now defaults to Release.
 
