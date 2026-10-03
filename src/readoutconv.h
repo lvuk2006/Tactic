@@ -1,5 +1,6 @@
 // ^
 // Property of Luka Vukmirica - All Rights Reserved. (luka.vukmirica@gmail.com)
+#include <stdint.h> 
 #ifndef READOUTCONV_H
 #define READOUTCONV_H
 

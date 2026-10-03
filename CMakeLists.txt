@@ -15,6 +15,8 @@ cmake_minimum_required(VERSION 3.20)
 # baffling error, so it is the cheaper default.
 project(tactic C ASM)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # build/compile_commands.json, for the editor
+
 # With a single-config generator (Make, Ninja) CMAKE_BUILD_TYPE defaults to
 # EMPTY -- which means no -O flag at all, i.e. -O0. That is not a warning, it
 # just silently produces a bigger, slower binary. Caught here by the build
@@ -71,6 +73,8 @@ endif()
 
 add_executable(${PROJECT_NAME}
     src/main.c
+    src/readoutconv.c
+    src/tanh_lut.c
 
     vendor/startup_mspm0g350x_gcc.c   # vector table, Reset_Handler: zeroes .bss,
                                       # copies .data from flash to SRAM, calls main

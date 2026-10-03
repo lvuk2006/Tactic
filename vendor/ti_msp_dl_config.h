@@ -78,6 +78,14 @@ extern "C" {
 
 
 
+/* Defines for TIMER_TICK */
+#define TIMER_TICK_INST                                                  (TIMG0)
+#define TIMER_TICK_INST_IRQHandler                              TIMG0_IRQHandler
+#define TIMER_TICK_INST_INT_IRQN                                (TIMG0_INT_IRQn)
+#define TIMER_TICK_INST_LOAD_VALUE                                      (12499U)
+
+
+
 
 /* Port definition for Pin Group GPIO_LEDS */
 #define GPIO_LEDS_PORT                                                   (GPIOB)
@@ -94,6 +102,14 @@ extern "C" {
 /* Defines for USER_TEST: GPIOB.16 with pinCMx 33 on package pin 4 */
 #define GPIO_LEDS_USER_TEST_PIN                                 (DL_GPIO_PIN_16)
 #define GPIO_LEDS_USER_TEST_IOMUX                                (IOMUX_PINCM33)
+/* Defines for S1: GPIOA.18 with pinCMx 40 on package pin 11 */
+#define GPIO_SWITCHES_S1_PORT                                            (GPIOA)
+#define GPIO_SWITCHES_S1_PIN                                    (DL_GPIO_PIN_18)
+#define GPIO_SWITCHES_S1_IOMUX                                   (IOMUX_PINCM40)
+/* Defines for S2: GPIOB.21 with pinCMx 49 on package pin 20 */
+#define GPIO_SWITCHES_S2_PORT                                            (GPIOB)
+#define GPIO_SWITCHES_S2_PIN                                    (DL_GPIO_PIN_21)
+#define GPIO_SWITCHES_S2_IOMUX                                   (IOMUX_PINCM49)
 
 
 /* clang-format on */
@@ -102,8 +118,11 @@ void SYSCFG_DL_init(void);
 void SYSCFG_DL_initPower(void);
 void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
+void SYSCFG_DL_TIMER_TICK_init(void);
 
 
+bool SYSCFG_DL_saveConfiguration(void);
+bool SYSCFG_DL_restoreConfiguration(void);
 
 #ifdef __cplusplus
 }

@@ -31,7 +31,7 @@ what makes the phase-independence result meaningful.
 Falling/rising edge interrupt plus a debounce counter, sampled at the tick rate.
 The ISR sets state; it does not run the pipeline.
 
-Two buttons on the LaunchPad: S1 is the pattern input, S2 re-arms after a fire.
+Two buttons on the LaunchPad: S2 is the pattern input, S1 re-arms after a fire.
 
 ## Bring-up order, one variable at a time
 
