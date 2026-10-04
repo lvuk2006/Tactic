@@ -57,7 +57,8 @@ endif()
 set(LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/vendor/device_linker.lds")
 
 # --- sources ---------------------------------------------------------------
-# src/    = your code.        vendor/ = unmodified TI files.
+# src/    = your code.        vendor/ = TI files. ti_msp_dl_config.{c,h} are
+#                             SysConfig output generated from tactic.syscfg.
 # Listed explicitly rather than with GLOB: a glob does not re-run when you add
 # a file, so new sources silently fail to build until you reconfigure.
 

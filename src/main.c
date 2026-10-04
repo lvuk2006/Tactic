@@ -19,15 +19,15 @@ int main(void){
 
     while (1) {
         while (!tick) {
-          __WFI(); // Sleep until interput arives
+            __WFI(); // Sleep until interrupt arrives
         }
-    tick = false; // Reset tick to false
-    DL_GPIO_togglePins(GPIO_LEDS_PORT, GPIO_LEDS_USER_LED_2_PIN);  // Toggle LED using GPIO for LED and Pin number as mask
+        tick = false; // Reset tick to false
+        DL_GPIO_togglePins(GPIO_LEDS_PORT, GPIO_LEDS_USER_LED_2_PIN);  // Toggle LED using GPIO for LED and Pin number as mask
     }
 }
 
 void TIMER_TICK_INST_IRQHandler(void){ // Timer zero interrupt function
     if (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST) == DL_TIMER_IIDX_ZERO){ // If zero event hits, flag becomes true
-        tick = true; 
+        tick = true;
     }
 }

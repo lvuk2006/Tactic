@@ -28,8 +28,14 @@ what makes the phase-independence result meaningful.
 
 ## Button input
 
-Falling/rising edge interrupt plus a debounce counter, sampled at the tick rate.
-The ISR sets state; it does not run the pipeline.
+Polled once per tick; there is no button interrupt. Sampling at 10 Hz is the
+debounce: contact bounce (a few ms, up to ~20 ms) is shorter than the 100 ms
+sample interval, so a sample taken mid-bounce reads either the old or the new
+level and the press registers at most one tick late (Ganssle, "A Guide to
+Debouncing"). A press shorter than one tick can be missed.
+
+The only interrupt is the timer tick. Its ISR sets a flag; it does not run the
+pipeline.
 
 Two buttons on the LaunchPad: S2 is the pattern input, S1 re-arms after a fire.
 
