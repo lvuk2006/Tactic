@@ -1,6 +1,6 @@
 // ^
 // Property of Luka Vukmirica - All Rights Reserved. (luka.vukmirica@gmail.com)
-#include <stdint.h> 
+#include <stdint.h>
 #ifndef READOUTCONV_H
 #define READOUTCONV_H
 
@@ -8,12 +8,13 @@
 #define MAX_WIDTH 12
 #define MAX_DEPTH 32
 
+// set fifo, FIFOROW and kern before calling convkinit
 
 typedef struct {
       int n, k;
-      int16_t fifo[MAX_DEPTH][MAX_WIDTH];
-      int FIFOROW;
-      int16_t kern[MAX_DEPTH][MAX_WIDTH];
+      int16_t *fifo;
+      int *FIFOROW;
+      const int16_t *kern;
   } ReadoutState;
 
 // Prototypes, so every caller shares ONE declaration of these.

@@ -109,11 +109,19 @@ _Static_assert(TANH_N == 256, "tanh table size changed -- recheck the index math
 
 /* ---- model state ----------------------------------------------------- */
 
+/* The ReadoutStates hold pointers only; the storage lives here. All C
+   reservoir channels see the same input, so they share ONE button history
+   and ONE write position; the readouts likewise share ONE feature history.
+   That is the 832 B of FIFO state in the SRAM note. The structs point back
+   into this Model, so a Model must never be copied by value. */
 typedef struct {
-    ReadoutState res[C];          /* n=1, k=K1. All C share the same input,   */
-                                  /* so all C FIFOs hold identical bytes; the */
-                                  /* firmware keeps ONE (see the SRAM note).  */
-    ReadoutState out[N_CLASS];    /* n=C, k=K2. Same: one FIFO, 3 kernels.    */
+    ReadoutState res[C];          /* n=1, k=K1, all sharing res_fifo/res_row  */
+    ReadoutState out[N_CLASS];    /* n=C, k=K2, all sharing out_fifo/out_row  */
+    int16_t res_kern[C][K1];      /* res[c].kern -> res_kern[c], [j] = j ago  */
+    int16_t out_kern[N_CLASS][K2 * C]; /* out[y].kern, [j*C + i]              */
+    int16_t res_fifo[K1];         /* shared button history                    */
+    int16_t out_fifo[K2 * C];     /* shared feature history                   */
+    int res_row, out_row;         /* shared write positions                   */
     int32_t bias_raw[N_CLASS];
     uint32_t seed;
 } Model;
@@ -128,27 +136,34 @@ static void model_init(Model *m, uint32_t seed) {
     /* Uniform in +/-sqrt(3/(nin*k)) gives unit-ish variance per tap, matching
        the normalisation used in acttest.c / fbtest.c. nin = 1 here. */
     float a = sqrtf(3.0f / (float)(1 * K1));
+    /* convkinit zeroes the fifo it points at but NOT the kernel; convkrun
+       would read garbage. Clear the kernel storage once, up front. */
+    memset(m->res_kern, 0, sizeof(m->res_kern));
+    memset(m->out_kern, 0, sizeof(m->out_kern));
     for (int c = 0; c < C; c++) {
+        m->res[c].fifo    = m->res_fifo;     /* point at storage BEFORE convkinit */
+        m->res[c].FIFOROW = &m->res_row;
+        m->res[c].kern    = m->res_kern[c];
         if (convkinit(&m->res[c], 1, K1) != 0) {
             fprintf(stderr, "FATAL: convkinit failed for reservoir channel %d\n", c);
             exit(2);
         }
-        memset(m->res[c].kern, 0, sizeof(m->res[c].kern));
         for (int j = 0; j < K1; j++) {
             float w = a * (2.0f * (rngnext(&r) / 4294967296.0f) - 1.0f);
             long q = lrintf(w * (float)(1 << RES_SHIFT));
             if (q >  32767) q =  32767;
             if (q < -32768) q = -32768;
-            m->res[c].kern[j][0] = (int16_t)q;
+            m->res_kern[c][j] = (int16_t)q;
         }
     }
     for (int y = 0; y < N_CLASS; y++) {
+        m->out[y].fifo    = m->out_fifo;
+        m->out[y].FIFOROW = &m->out_row;
+        m->out[y].kern    = m->out_kern[y];
         if (convkinit(&m->out[y], C, K2) != 0) {
             fprintf(stderr, "FATAL: convkinit failed for readout %d\n", y);
             exit(2);
         }
-        /* convkinit zeroes fifo but NOT kern; convkrun would read garbage. */
-        memset(m->out[y].kern, 0, sizeof(m->out[y].kern));
         m->bias_raw[y] = 0;
     }
 
@@ -158,10 +173,10 @@ static void model_init(Model *m, uint32_t seed) {
        hundred lines away. Fail here instead, where the cause is visible. */
     int nz = 0;
     for (int c = 0; c < C; c++)
-        for (int j = 0; j < K1; j++) if (m->res[c].kern[j][0] != 0) nz++;
+        for (int j = 0; j < K1; j++) if (m->res_kern[c][j] != 0) nz++;
     if (nz == 0) {
         fprintf(stderr, "FATAL: all %d reservoir kernel taps are zero after init.\n"
-                        "       Check RES_SHIFT and the ReadoutState.kern type.\n",
+                        "       Check RES_SHIFT and the Model.res_kern type.\n",
                 C * K1);
         exit(2);
     }
@@ -171,14 +186,10 @@ static void model_reset(Model *m) {
     /* Zeroing the FIFOs is physically correct, not a warm-up hack: an all-zero
        history is exactly the state after a long idle with the button released,
        which is how the device actually starts. */
-    for (int c = 0; c < C; c++) {
-        memset(m->res[c].fifo, 0, sizeof(m->res[c].fifo));
-        m->res[c].FIFOROW = 0;
-    }
-    for (int y = 0; y < N_CLASS; y++) {
-        memset(m->out[y].fifo, 0, sizeof(m->out[y].fifo));
-        m->out[y].FIFOROW = 0;
-    }
+    memset(m->res_fifo, 0, sizeof(m->res_fifo));   /* one shared history each */
+    memset(m->out_fifo, 0, sizeof(m->out_fifo));
+    m->res_row = 0;
+    m->out_row = 0;
 }
 
 /* The firmware's tanh lookup, exactly as tanh_table.h documents it. */
@@ -190,7 +201,9 @@ static inline int16_t tanh_lookup(int32_t acc) {
 }
 
 /* Advance one step. Push-then-run at both stages, matching convkrun's
-   FIFOROW-1 indexing.
+   FIFOROW-1 indexing. Each stage's history is shared, so it is pushed ONCE
+   and then run once per channel -- pushing per channel would advance the
+   shared write position C times.
      feat  (optional) receives the flattened readout window, normalised to
            float for ridgefit: feat[j*C+i] = fifo[j ticks ago][i] / 2^15.
      score (optional) receives the raw Q(15+osh) score per class, bias folded
@@ -201,22 +214,22 @@ static void model_step(Model *m, uint8_t btn, float *feat, int32_t *score) {
     int16_t b = btn ? 1 : 0;          /* LITERAL 0/1, not Q15 */
     int16_t h[C];
 
+    convkfifo(&m->res[0], &b);        /* one push into the shared button history */
     for (int c = 0; c < C; c++) {
-        convkfifo(&m->res[c], &b);
         int32_t acc = convkrun(&m->res[c]);
         double a = fabs((double)acc);
         if (a > obs_res_max) obs_res_max = a;
         h[c] = tanh_lookup(acc);
     }
 
-    for (int y = 0; y < N_CLASS; y++) convkfifo(&m->out[y], h);
+    convkfifo(&m->out[0], h);         /* one push into the shared feature history */
 
     if (feat) {
-        int k = m->out[0].k, n = m->out[0].n, row = m->out[0].FIFOROW;
+        int k = m->out[0].k, n = m->out[0].n, row = *m->out[0].FIFOROW;
         for (int j = 0; j < k; j++) {
             int src = (((row - 1) - j) % k + k) % k;
             for (int i = 0; i < n; i++)
-                feat[j * n + i] = (float)m->out[0].fifo[src][i] / FEAT_SCALE;
+                feat[j * n + i] = (float)m->out[0].fifo[src * n + i] / FEAT_SCALE;
         }
     }
 
@@ -428,7 +441,7 @@ static void emit_weights(const char *path, Model *m,
     fprintf(f, "}\n");
     fprintf(f, "#define W_TANH(acc)  TANH_LUT[W_TANH_INDEX(acc)]\n\n");
 
-    /* reservoir kernels: W_RES[c][j] <-> res[c].kern[j][0], j = ticks ago */
+    /* reservoir kernels: W_RES[c][j] <-> res_kern[c][j], j = ticks ago */
     fprintf(f, "/* W_RES[c][j] -> reservoir channel c, kern[j][0]; j = ticks ago. */\n");
     fprintf(f, "static const int16_t W_RES[W_C][W_K1] = {\n");
     for (int c = 0; c < C; c++) {
@@ -634,7 +647,7 @@ int main(int argc, char **argv) {
             for (int y = 0; y < N_CLASS; y++) {
                 for (int j = 0; j < K2; j++)
                     for (int i = 0; i < C; i++)
-                        m.out[y].kern[j][i] = oq[y * DIM + j * C + i];
+                        m.out_kern[y][j * C + i] = oq[y * DIM + j * C + i];
                 m.bias_raw[y] = (int32_t)llrint((double)rw[y].bias
                                                 * ldexp(1.0, SCORE_SHIFT(OUT_SHIFT_PREF)));
             }
@@ -693,7 +706,7 @@ int main(int argc, char **argv) {
        at the pinned RES_SHIFT). Gather them for the bound and for emit. */
     int16_t rq[C * K1];
     for (int c = 0; c < C; c++)
-        for (int j = 0; j < K1; j++) rq[c * K1 + j] = m.res[c].kern[j][0];
+        for (int j = 0; j < K1; j++) rq[c * K1 + j] = m.res_kern[c][j];
     double res_bound = acc_bound(rq, C, K1, 1.0);   /* max|input| = 1, literal 0/1 */
 
     /* Readout: try the preferred shift, verify the L1 bound WITH the bias
@@ -731,7 +744,7 @@ int main(int argc, char **argv) {
     for (int y = 0; y < N_CLASS; y++) {
         for (int j = 0; j < K2; j++)
             for (int i = 0; i < C; i++)
-                m.out[y].kern[j][i] = oq[y * DIM + j * C + i];
+                m.out_kern[y][j * C + i] = oq[y * DIM + j * C + i];
         bias_raw[y] = (int32_t)llrint((double)rw[y].bias * ldexp(1.0, SCORE_SHIFT(osh)));
         m.bias_raw[y] = bias_raw[y];
     }

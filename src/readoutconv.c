@@ -7,7 +7,7 @@
 
 
 
-int convkinit(ReadoutState *rs, int32_t width, int32_t height) {
+int convkinit(ReadoutState *rs, int32_t width, int32_t height){
     if ((width > MAX_WIDTH) | (width <= 0) | (height > MAX_DEPTH) | (height <= 0)) { // Makes sure kernel values are not out of bounds
         return -1;
     }
@@ -17,38 +17,30 @@ int convkinit(ReadoutState *rs, int32_t width, int32_t height) {
 
     for (int j = 0; j < rs->k ; j++){ // Sets new dimensions space of kernel to zero
             for (int i = 0; i < rs->n; i++){
-                rs->fifo[j][i] = 0; 
+                rs->fifo[rs->n * j + i] = 0; // For all references of fifo and kern since
+                // they are pointers now, the system must calculate
+                // offset instead of using "[j][i]" due to pointer carrying no information
+                // about the array it is referencing.
             }
     }
-    rs->FIFOROW = 0; // Initialize FIFO row index to zero
+    *rs->FIFOROW = 0; // Initialize FIFO row index to zero
 
     return 0; // Initialization success
     }
 
 void convkfifo(ReadoutState *rs, int16_t input[]){
     for (int i = 0; i < rs->n; i++){ // Plug in new input from N-taps into FIFO
-        rs->fifo[rs->FIFOROW][i] = input[i];
+        rs->fifo[*rs->FIFOROW * rs->n + i] = input[i];
     }
 
-    for(int j = 0; j < (rs->k); j++){
-            for(int u = 0; u < rs->n; u++){
-                //printf("FIFO looks like: %2f\n",rs->fifo[j][u]);
-            }
-        }
-
-    rs->FIFOROW = (1 + rs->FIFOROW) % rs->k; // Loopback or increment FIFOROW
+    *rs->FIFOROW = (1 + *rs->FIFOROW) % rs->k; // Loopback or increment FIFOROW
 }
 
 int32_t convkrun(ReadoutState *rs){
     int32_t ACC = 0;
     for(int j = 0; j < rs->k; j++){ // Do convolution with kernel and FIFO
-        for(int i = 0; i < rs->n; i++){ 
-            ACC = ACC + rs->fifo[(((rs->FIFOROW - 1)-j) % rs->k + rs->k) % rs->k][i]*rs->kern[j][i];
-            //printf("Here's FIFO: %2f\n", rs->fifo[(((rs->FIFOROW - 1)-j) % rs->k + rs->k) % rs->k][i]);
-            //printf("Here's FIFO row value: %i\n", (((rs->FIFOROW - 1)-j) % rs->k + rs->k) % rs->k);
-            //printf("Here's KERN: %2f\n", rs->kern[j][i]);
-            //printf("Here's KERN row value: %i\n", j);
-            //printf("Here's ACC: %2f\n", ACC);
+        for(int i = 0; i < rs->n; i++){
+            ACC = ACC + rs->fifo[rs->n*((((*rs->FIFOROW - 1)-j) % rs->k + rs->k) % rs->k) + i]*rs->kern[rs->n*j + i];
         }
     }
 
