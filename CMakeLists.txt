@@ -74,6 +74,7 @@ endif()
 
 add_executable(${PROJECT_NAME}
     src/main.c
+    src/pipeline.c
     src/readoutconv.c
     src/tanh_lut.c
 

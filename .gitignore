@@ -14,6 +14,7 @@ build/
 # host tool binaries
 host/btnfit
 host/btnvec_check
+host/golden_check
 
 # generated weights are checked IN on purpose -- the demo must be
 # reproducible from the repo alone. Do not add weights.h here.

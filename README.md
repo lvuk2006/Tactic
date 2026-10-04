@@ -17,21 +17,15 @@ rather than by measurement.
 
 ## Status
 
-Everything below the entry point is done and verified. The entry point is the last piece,
-and it is what I am writing now.
+The firmware runs on the board. What is still open is listed under
+[What is verified, and what is not](#what-is-verified-and-what-is-not).
 
 - Model, fitting pipeline, fixed-point kernels, tanh LUT, generated weights and golden
   vectors: **done**, and the numbers below are measured on them
 - CMake + arm-none-eabi toolchain and DSLite flashing: **done** — the CMake build reproduces
   TI's own makefile output byte for byte, 688 B, which is how I know the toolchain is honest
-- Runtime loop, button ISR and LED output: **in progress.** `src/main.c` is deliberately not
-  in the repo until it is complete — I would rather ship no entry point than TI's blink example
-  wearing my name.
+- Runtime loop, 10 Hz timer tick and LED output: **done**, running on the board
 
-Practical consequence: the **host tools build and run today**, and the firmware target is
-skipped by CMake until `src/main.c` lands. That is the only thing missing, and
-[`src/RUNTIME_PLAN.md`](src/RUNTIME_PLAN.md) says exactly what goes in it and in what order
-I am bringing it up.
 
 ## The task, and why it is not trivial
 
@@ -122,7 +116,7 @@ Host tools and a refit, which rewrites `src/weights.h` and `host/golden.h`:
 It is deterministic — same initialization seed, same output, byte for byte. `weights.h` is checked into
 the repo on purpose, so the firmware builds without running the fitter first.
 
-Firmware (once `src/main.c` is in — see Status):
+Firmware:
 
     cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
     cmake --build build
@@ -141,15 +135,18 @@ TI's 688 B. `CMakeLists.txt` now defaults to Release.
 Verified: the fit reproduces byte-identically; host and firmware share one arithmetic path;
 the FIFO indexing is phase-independent (all 32 start phases produce identical output, so
 there is no incomplete-window case); both accumulator bounds are asserted at compile time.
-This means that at any point in time where the system is running, it is designed to properly 
-run inference the input pattern.
+This means that at any point in time where the system is running, it is designed to properly
+run inference on the input pattern.
 
-Not verified: anything involving the board, because the runtime loop is not written yet.
+Verified on the board: the runtime loop runs on a 10 Hz timer tick (measured 98.5 ms on a
+scope), sampling the button once per timer tick, and responds correctly to all three
+gestures. Verified on the host: `make check` replays the golden traces through the
+firmware's own `src/pipeline.c`, and all 1,440 scores are bit-identical to the fitter's.
 
-Next, in order: the runtime loop and button ISR, then the golden vectors replayed on target,
-then cycle counts from a TIMG channel. After that, two measurements I want — accuracy and
-score margin against input jitter, and the same for a hand-written state machine on the same
-traces.
+Not verified: the golden replay on the chip itself, the decision path (argmax, threshold)
+against the golden fire ticks, accuracy measured on the board, and cycle counts. After that,
+two measurements I want — accuracy and score margin against input jitter, and the same for a
+hand-written state machine on the same traces.
 
 ## Where this sits
 
